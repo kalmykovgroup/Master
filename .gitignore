@@ -66,6 +66,21 @@ yarn-error.log
 # testing
 /coverage
 
+# Build output
+dist/
+
+# Supabase local data & secrets
+supabase/docker/volumes/db/data/
+supabase/docker/.env
+supabase/docker/secrets.env
+supabase/docker/secrets/
+
+# Windows artifacts
+nul
+
+# Claude Code
+.claude/
+
 # Yarn
 .yarn/*
 !.yarn/patches
