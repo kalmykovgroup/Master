@@ -1,0 +1,45 @@
+name: Deploy OTA Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Target platform
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
+      force_update:
+        description: Force update (users must update immediately)
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create .env.hotupdater
+        run: |
+          cat > .env.hotupdater << EOF
+          HOT_UPDATER_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          HOT_UPDATER_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          HOT_UPDATER_SUPABASE_BUCKET_NAME=hot-updater-bundles
+          EOF
+
+      - name: Deploy OTA
+        run: |
+          npx hot-updater deploy \
+            -p ${{ inputs.platform }} \
+            ${{ inputs.force_update && '-f' || '' }}

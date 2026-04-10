@@ -155,6 +155,7 @@ export interface Database {
           order_id: string;
           client_id: string;
           master_id: string;
+          status: string;
           last_message_at: string | null;
           created_at: string;
         };
@@ -163,6 +164,7 @@ export interface Database {
           order_id: string;
           client_id: string;
           master_id: string;
+          status?: string;
           last_message_at?: string | null;
           created_at?: string;
         };
@@ -171,6 +173,7 @@ export interface Database {
           order_id?: string;
           client_id?: string;
           master_id?: string;
+          status?: string;
           last_message_at?: string | null;
           created_at?: string;
         };
@@ -291,6 +294,67 @@ export interface Database {
           viewed_at?: string;
         };
       };
+      saved_filters: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          categories: string[];
+          budget_min: number | null;
+          budget_max: number | null;
+          location: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          categories?: string[];
+          budget_min?: number | null;
+          budget_max?: number | null;
+          location?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          categories?: string[];
+          budget_min?: number | null;
+          budget_max?: number | null;
+          location?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+      };
+      app_versions: {
+        Row: {
+          id: string;
+          platform: string;
+          version: string;
+          min_version: string;
+          store_url: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          platform: string;
+          version: string;
+          min_version: string;
+          store_url: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          platform?: string;
+          version?: string;
+          min_version?: string;
+          store_url?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -302,7 +366,7 @@ export interface Database {
       };
       get_unread_counts: {
         Args: Record<string, never>;
-        Returns: { conversation_id: string; unread_count: number }[];
+        Returns: { conversation_id: string; unread_count: number; conversation_status: string }[];
       };
     };
     Enums: {
@@ -326,6 +390,8 @@ export type Conversation = Tables<'conversations'>;
 export type Message = Tables<'messages'>;
 export type Review = Tables<'reviews'>;
 export type SpecialOffer = Tables<'special_offers'>;
+export type SavedFilter = Tables<'saved_filters'>;
+export type AppVersion = Tables<'app_versions'>;
 
 export interface PendingUploadMessage {
   id: string;

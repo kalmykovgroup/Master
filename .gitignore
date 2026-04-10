@@ -78,6 +78,9 @@ supabase/docker/secrets/
 # Windows artifacts
 nul
 
+# Hot Updater
+.env.hotupdater
+
 # Claude Code
 .claude/
 

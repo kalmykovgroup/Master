@@ -108,14 +108,48 @@
     "renovation": "Renovation",
     "furniture": "Furniture",
     "appliances": "Appliances",
+    "painting": "Painting",
+    "landscaping": "Landscaping",
+    "moving": "Moving",
+    "locksmith": "Locksmith",
+    "hvac": "HVAC",
+    "roofing": "Roofing",
+    "windows": "Windows",
+    "flooring": "Flooring",
+    "tiling": "Tiling",
+    "welding": "Welding",
+    "carpentry": "Carpentry",
+    "pest_control": "Pest Control",
+    "security": "Security",
     "other": "Other"
+  },
+  "filters": {
+    "filter": "Filter",
+    "filters": "Filters",
+    "filterName": "Filter name",
+    "filterNamePlaceholder": "E.g.: Plumbing nearby",
+    "save": "Save",
+    "deleteConfirm": "Delete filter?",
+    "noFilters": "No saved filters",
+    "budgetFrom": "Budget from",
+    "budgetTo": "Budget to",
+    "location": "Location",
+    "locationPlaceholder": "City or area",
+    "selectCategories": "Select categories",
+    "categoriesCount": "Categories ({{count}})"
   },
   "chat": {
     "chats": "Chats",
     "inputPlaceholder": "Message...",
     "noChats": "No conversations",
     "noMessages": "No messages",
-    "selectChat": "Select a chat"
+    "selectChat": "Select a chat",
+    "archive": "Archive",
+    "archived": "Archived chats",
+    "toArchive": "Archive",
+    "fromArchive": "Unarchive",
+    "noArchivedChats": "No archived chats",
+    "chatClosed": "Conversation closed — response was declined"
   },
   "profile": {
     "profile": "Profile",
@@ -125,6 +159,7 @@
     "rating": "Rating",
     "reviews": "Reviews",
     "logout": "Sign Out",
+    "logoutConfirm": "Are you sure you want to sign out?",
     "editProfile": "Edit Profile",
     "namePlaceholder": "Your name",
     "bioPlaceholder": "Tell about yourself",
@@ -151,6 +186,7 @@
     "submit": "Submit Review",
     "sent": "Review sent!",
     "noReviews": "No reviews yet",
+    "negative": "Negative",
     "ratingRequired": "Rate this person"
   },
   "specialists": {
@@ -158,6 +194,13 @@
     "lookingForOrders": "Looking for orders",
     "lastActive": "Last active",
     "noSpecialists": "No specialists yet"
+  },
+  "update": {
+    "title": "Update Available",
+    "forceMessage": "A new version {{version}} is available. Please update the app to continue.",
+    "optionalMessage": "A new version {{version}} is available. We recommend updating.",
+    "updateButton": "Update",
+    "later": "Later"
   },
   "tabs": {
     "orders": "Orders",

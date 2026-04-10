@@ -5,6 +5,19 @@ export const ORDER_CATEGORIES = [
   'renovation',
   'furniture',
   'appliances',
+  'painting',
+  'landscaping',
+  'moving',
+  'locksmith',
+  'hvac',
+  'roofing',
+  'windows',
+  'flooring',
+  'tiling',
+  'welding',
+  'carpentry',
+  'pest_control',
+  'security',
   'other',
 ] as const;
 
@@ -29,3 +42,5 @@ export type UserRole = (typeof ROLES)[number];
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
+
+export const APP_VERSION = '1.0.0';

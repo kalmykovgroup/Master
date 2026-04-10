@@ -108,14 +108,48 @@
     "renovation": "Ремонт",
     "furniture": "Мебель",
     "appliances": "Бытовая техника",
+    "painting": "Покраска",
+    "landscaping": "Благоустройство",
+    "moving": "Переезд",
+    "locksmith": "Замки",
+    "hvac": "Кондиционеры",
+    "roofing": "Кровля",
+    "windows": "Окна",
+    "flooring": "Полы",
+    "tiling": "Плитка",
+    "welding": "Сварка",
+    "carpentry": "Столярные работы",
+    "pest_control": "Дезинсекция",
+    "security": "Безопасность",
     "other": "Другое"
+  },
+  "filters": {
+    "filter": "Фильтр",
+    "filters": "Фильтры",
+    "filterName": "Название фильтра",
+    "filterNamePlaceholder": "Например: Сантехника рядом",
+    "save": "Сохранить",
+    "deleteConfirm": "Удалить фильтр?",
+    "noFilters": "Нет сохранённых фильтров",
+    "budgetFrom": "Бюджет от",
+    "budgetTo": "Бюджет до",
+    "location": "Местоположение",
+    "locationPlaceholder": "Город или район",
+    "selectCategories": "Выберите категории",
+    "categoriesCount": "Категории ({{count}})"
   },
   "chat": {
     "chats": "Чаты",
     "inputPlaceholder": "Сообщение...",
     "noChats": "Нет диалогов",
     "noMessages": "Нет сообщений",
-    "selectChat": "Выберите чат"
+    "selectChat": "Выберите чат",
+    "archive": "Архив",
+    "archived": "Архивные чаты",
+    "toArchive": "В архив",
+    "fromArchive": "Из архива",
+    "noArchivedChats": "Нет архивных чатов",
+    "chatClosed": "Переписка завершена — отклик отклонён"
   },
   "profile": {
     "profile": "Профиль",
@@ -125,6 +159,7 @@
     "rating": "Рейтинг",
     "reviews": "Отзывы",
     "logout": "Выйти",
+    "logoutConfirm": "Вы уверены, что хотите выйти?",
     "editProfile": "Редактировать профиль",
     "namePlaceholder": "Ваше имя",
     "bioPlaceholder": "Расскажите о себе",
@@ -151,6 +186,7 @@
     "submit": "Отправить отзыв",
     "sent": "Отзыв отправлен!",
     "noReviews": "Отзывов пока нет",
+    "negative": "Негативные",
     "ratingRequired": "Поставьте оценку"
   },
   "specialists": {
@@ -158,6 +194,13 @@
     "lookingForOrders": "Ищу заказы",
     "lastActive": "Был(а) активен(а)",
     "noSpecialists": "Специалистов пока нет"
+  },
+  "update": {
+    "title": "Обновление",
+    "forceMessage": "Доступна новая версия {{version}}. Для продолжения работы необходимо обновить приложение.",
+    "optionalMessage": "Доступна новая версия {{version}}. Рекомендуем обновить приложение.",
+    "updateButton": "Обновить",
+    "later": "Позже"
   },
   "tabs": {
     "orders": "Заказы",
