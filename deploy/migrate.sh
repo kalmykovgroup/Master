@@ -13,11 +13,16 @@ POSTGRES_HOST="${POSTGRES_HOST:-db}"
 # Choose psql method: docker exec for local, network psql for remote
 if [ "$POSTGRES_HOST" = "db" ]; then
   DB_CONTAINER="supabase-db"
+  # Use sudo for docker if not in docker group yet
+  DOCKER_CMD="docker"
+  if ! docker info > /dev/null 2>&1; then
+    DOCKER_CMD="sudo docker"
+  fi
   psql_cmd() {
-    docker exec "$DB_CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 "$@"
+    $DOCKER_CMD exec "$DB_CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 "$@"
   }
   psql_file() {
-    docker exec -i "$DB_CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 < "$1"
+    $DOCKER_CMD exec -i "$DB_CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 < "$1"
   }
 else
   # Load password for remote connection

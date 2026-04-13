@@ -78,7 +78,8 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
         run: |
           sed "s/\\\$DOMAIN/$DOMAIN/g" deploy/nginx.conf > /tmp/nginx-master.conf
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" /tmp/nginx-master.conf $TARGET:/etc/nginx/sites-available/master
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" /tmp/nginx-master.conf $TARGET:/tmp/nginx-master.conf
+          ssh -i ~/.ssh/deploy_key $TARGET "sudo cp /tmp/nginx-master.conf /etc/nginx/sites-available/master && rm /tmp/nginx-master.conf"
 
       - name: Run migrations
         if: ${{ matrix.server == fromJson(vars.APP_SERVERS)[0] }}
@@ -93,6 +94,6 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key $TARGET \
             "cd /opt/master/supabase/docker && \
-             docker compose build functions && \
-             docker compose up -d functions && \
-             nginx -t && systemctl reload nginx"
+             sudo docker compose build functions && \
+             sudo docker compose up -d functions && \
+             sudo nginx -t && sudo systemctl reload nginx"

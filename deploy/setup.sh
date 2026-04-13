@@ -29,23 +29,58 @@ echo "  Role: $VM_ROLE"
 echo "  Domain: $DOMAIN"
 echo "  DB host: $POSTGRES_HOST"
 
+# --- Phase 0.5: OS update & upgrade ---
+echo "[0/9] Updating OS..."
+sudo apt-get update -qq
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+
 # --- Phase 1: Install packages ---
-echo "[1/8] Installing packages..."
-apt-get update -qq
-apt-get install -y -qq docker.io docker-compose-plugin nginx certbot python3-certbot-nginx
+echo "[1/9] Installing packages..."
+sudo apt-get install -y -qq \
+  docker.io docker-compose-plugin \
+  nginx certbot python3-certbot-nginx \
+  fail2ban ufw
 
-systemctl enable --now docker
+sudo systemctl enable --now docker
 
-# --- Phase 2: Create directories ---
-echo "[2/8] Creating directories..."
-mkdir -p /var/www/master/dist
-mkdir -p /opt/master/supabase/docker
-mkdir -p /opt/master/supabase/migrations
-mkdir -p /opt/master/supabase/functions
-mkdir -p /opt/master/deploy
+# Add current user to docker group (no sudo needed for docker commands after re-login)
+sudo usermod -aG docker "$USER" 2>/dev/null || true
 
-# --- Phase 3: Copy files ---
-echo "[3/8] Copying files..."
+# --- Phase 1.5: Firewall + brute-force protection ---
+echo "[2/9] Configuring firewall & fail2ban..."
+
+# UFW: allow only SSH, HTTP, HTTPS
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow http
+sudo ufw allow https
+sudo ufw --force enable
+
+# fail2ban: protect SSH
+sudo mkdir -p /etc/fail2ban/jail.d
+sudo tee /etc/fail2ban/jail.d/sshd.conf > /dev/null <<'F2B'
+[sshd]
+enabled = true
+port = ssh
+maxretry = 5
+bantime = 3600
+findtime = 600
+F2B
+sudo systemctl enable --now fail2ban
+sudo systemctl restart fail2ban
+
+# --- Phase 3: Create directories ---
+echo "[3/9] Creating directories..."
+sudo mkdir -p /var/www/master/dist
+sudo mkdir -p /opt/master/supabase/docker
+sudo mkdir -p /opt/master/supabase/migrations
+sudo mkdir -p /opt/master/supabase/functions
+sudo mkdir -p /opt/master/deploy
+sudo chown -R "$USER":"$USER" /opt/master /var/www/master
+
+# --- Phase 4: Copy files ---
+echo "[4/9] Copying files..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cp "$SCRIPT_DIR"/../supabase/docker/docker-compose.yml /opt/master/supabase/docker/
 cp -r "$SCRIPT_DIR"/../supabase/docker/volumes /opt/master/supabase/docker/ 2>/dev/null || true
@@ -54,8 +89,8 @@ cp "$SCRIPT_DIR"/../supabase/migrations/*.sql /opt/master/supabase/migrations/ 2
 cp "$SCRIPT_DIR"/migrate.sh /opt/master/deploy/
 chmod +x /opt/master/deploy/migrate.sh
 
-# --- Phase 4: Generate .env from environment ---
-echo "[4/8] Generating .env..."
+# --- Phase 5: Generate .env from environment ---
+echo "[5/9] Generating .env..."
 cat > /opt/master/supabase/docker/.env <<ENVEOF
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
@@ -91,27 +126,27 @@ FILE_SIZE_LIMIT=52428800
 FCM_SERVICE_ACCOUNT_JSON=${FCM_SERVICE_ACCOUNT_JSON}
 ENVEOF
 
-# --- Phase 5: Start services ---
-echo "[5/8] Starting services (role: $VM_ROLE)..."
+# --- Phase 6: Start services ---
+echo "[6/9] Starting services (role: $VM_ROLE)..."
 COMPOSE_FILE="/opt/master/supabase/docker/docker-compose.yml"
 
 case "$VM_ROLE" in
   full)
-    docker compose -f "$COMPOSE_FILE" --profile full up -d --build
+    sudo docker compose -f "$COMPOSE_FILE" --profile full up -d --build
     ;;
   app)
-    docker compose -f "$COMPOSE_FILE" up -d --build
+    sudo docker compose -f "$COMPOSE_FILE" up -d --build
     ;;
   db)
-    docker compose -f "$COMPOSE_FILE" --profile db up -d
+    sudo docker compose -f "$COMPOSE_FILE" --profile db up -d
     ;;
 esac
 
-# --- Phase 6: Wait for DB + migrations ---
+# --- Phase 7: Wait for DB + migrations ---
 if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "db" ]; then
-  echo "[6/8] Waiting for database..."
+  echo "[7/9] Waiting for database..."
   for i in $(seq 1 30); do
-    if docker exec supabase-db pg_isready -U postgres > /dev/null 2>&1; then
+    if sudo docker exec supabase-db pg_isready -U postgres > /dev/null 2>&1; then
       echo "  Database ready."
       break
     fi
@@ -125,45 +160,46 @@ if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "db" ]; then
   echo "  Running migrations..."
   bash /opt/master/deploy/migrate.sh
 else
-  echo "[6/8] Skipping DB wait (role: $VM_ROLE, DB is external)"
+  echo "[7/9] Skipping DB wait (role: $VM_ROLE, DB is external)"
 fi
 
-# --- Phase 7: Configure Nginx ---
+# --- Phase 8: Configure Nginx ---
 if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "app" ]; then
-  echo "[7/8] Configuring Nginx..."
-  sed "s/\\\$DOMAIN/$DOMAIN/g" "$SCRIPT_DIR"/nginx.conf > /etc/nginx/sites-available/master
-  ln -sf /etc/nginx/sites-available/master /etc/nginx/sites-enabled/master
-  rm -f /etc/nginx/sites-enabled/default
-  nginx -t && systemctl reload nginx
+  echo "[8/9] Configuring Nginx..."
+  sed "s/\\\$DOMAIN/$DOMAIN/g" "$SCRIPT_DIR"/nginx.conf | sudo tee /etc/nginx/sites-available/master > /dev/null
+  sudo ln -sf /etc/nginx/sites-available/master /etc/nginx/sites-enabled/master
+  sudo rm -f /etc/nginx/sites-enabled/default
+  sudo nginx -t && sudo systemctl reload nginx
 else
-  echo "[7/8] Skipping Nginx (role: $VM_ROLE)"
+  echo "[8/9] Skipping Nginx (role: $VM_ROLE)"
 fi
 
-# --- Phase 8: SSL ---
+# --- Phase 9: SSL ---
 if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "app" ]; then
   if [ -n "$CERTBOT_EMAIL" ]; then
     if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
-      echo "[8/8] Obtaining SSL certificate..."
-      certbot --nginx \
+      echo "[9/9] Obtaining SSL certificate..."
+      sudo certbot --nginx \
         -d "$DOMAIN" \
         --non-interactive \
         --agree-tos \
         --email "$CERTBOT_EMAIL" \
         --redirect
     else
-      echo "[8/8] SSL certificate already exists."
-      # Ensure auto-renewal
-      systemctl enable --now certbot.timer 2>/dev/null || \
-        (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet") | sort -u | crontab -
+      echo "[9/9] SSL certificate already exists."
+      sudo systemctl enable --now certbot.timer 2>/dev/null || \
+        (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet") | sort -u | sudo crontab -
     fi
   else
-    echo "[8/8] Skipping SSL (CERTBOT_EMAIL not set)"
-    echo "  To add SSL later: certbot --nginx -d $DOMAIN"
+    echo "[9/9] Skipping SSL (CERTBOT_EMAIL not set)"
+    echo "  To add SSL later: sudo certbot --nginx -d $DOMAIN"
   fi
 else
-  echo "[8/8] Skipping SSL (role: $VM_ROLE)"
+  echo "[9/9] Skipping SSL (role: $VM_ROLE)"
 fi
 
 echo ""
 echo "=== Setup complete (role: $VM_ROLE) ==="
 echo "  Domain: https://$DOMAIN"
+echo "  Firewall: UFW enabled (SSH, HTTP, HTTPS)"
+echo "  Brute-force: fail2ban protecting SSH"

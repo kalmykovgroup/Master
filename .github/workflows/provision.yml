@@ -49,7 +49,7 @@ jobs:
              CERTBOT_EMAIL='${{ vars.CERTBOT_EMAIL }}' \
              POSTGRES_HOST='${{ vars.POSTGRES_HOST }}' \
              FCM_SERVICE_ACCOUNT_JSON='${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}' \
-             && cd /tmp/master-setup && bash deploy/setup.sh"
+             && cd /tmp/master-setup && sudo -E bash deploy/setup.sh"
 
       - name: Cleanup temp files
         run: |
