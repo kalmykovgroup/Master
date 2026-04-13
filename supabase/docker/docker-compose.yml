@@ -263,9 +263,6 @@ services:
       context: ../functions
       dockerfile: Dockerfile
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       SUPABASE_URL: http://kong:8000
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
@@ -274,6 +271,7 @@ services:
       - "8082:8000"
 
   db:
+    profiles: ["db", "full"]
     container_name: supabase-db
     image: supabase/postgres:15.1.1.41
     restart: unless-stopped

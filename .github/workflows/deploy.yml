@@ -5,9 +5,8 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,60 +27,72 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        server: ${{ fromJson(vars.APP_SERVERS) }}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ vars.VPS_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ matrix.server }} >> ~/.ssh/known_hosts
 
-      - name: Deploy dist
+      - name: Deploy files
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
         run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            dist/ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/var/www/master/dist/
+          SSH="ssh -i ~/.ssh/deploy_key"
+          RSYNC="rsync -avz -e '$SSH'"
 
-      - name: Deploy migrations
-        run: |
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            supabase/migrations/ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/master/supabase/migrations/
+          # Ensure directories exist
+          $SSH $TARGET "mkdir -p /opt/master/supabase/docker /opt/master/supabase/functions /opt/master/supabase/migrations /opt/master/deploy /var/www/master/dist"
 
-      - name: Deploy Edge Functions
-        run: |
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            supabase/functions/ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/master/supabase/functions/
-
-      - name: Deploy docker-compose
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} \
-            "mkdir -p /opt/master/supabase/docker"
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            supabase/docker/docker-compose.yml ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/master/supabase/docker/docker-compose.yml
-
-      - name: Deploy scripts
-        run: |
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            deploy/ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/opt/master/deploy/
+          # Deploy all files
+          eval $RSYNC --delete dist/ $TARGET:/var/www/master/dist/
+          eval $RSYNC supabase/migrations/ $TARGET:/opt/master/supabase/migrations/
+          eval $RSYNC supabase/functions/ $TARGET:/opt/master/supabase/functions/
+          eval $RSYNC supabase/docker/docker-compose.yml $TARGET:/opt/master/supabase/docker/docker-compose.yml
+          eval $RSYNC deploy/ $TARGET:/opt/master/deploy/
 
       - name: Deploy nginx config
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
+          DOMAIN: ${{ vars.DOMAIN }}
         run: |
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            deploy/nginx.conf ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:/etc/nginx/sites-available/master
+          sed "s/\\\$DOMAIN/$DOMAIN/g" deploy/nginx.conf > /tmp/nginx-master.conf
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" /tmp/nginx-master.conf $TARGET:/etc/nginx/sites-available/master
 
       - name: Run migrations
+        if: ${{ matrix.server == fromJson(vars.APP_SERVERS)[0] }}
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
         run: |
-          ssh -i ~/.ssh/deploy_key \
-            ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} \
-            "bash /opt/master/deploy/migrate.sh"
+          ssh -i ~/.ssh/deploy_key $TARGET "bash /opt/master/deploy/migrate.sh"
 
-      - name: Rebuild and restart Edge Functions
+      - name: Rebuild and restart services
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
         run: |
-          ssh -i ~/.ssh/deploy_key \
-            ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} \
-            "cd /opt/master/supabase/docker && docker compose build functions && docker compose up -d functions && nginx -t && systemctl reload nginx"
+          ssh -i ~/.ssh/deploy_key $TARGET \
+            "cd /opt/master/supabase/docker && \
+             docker compose build functions && \
+             docker compose up -d functions && \
+             nginx -t && systemctl reload nginx"

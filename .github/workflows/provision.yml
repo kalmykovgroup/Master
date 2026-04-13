@@ -1,0 +1,68 @@
+name: Provision New VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_ip:
+        description: "IP address of the new VM"
+        required: true
+      role:
+        description: "VM role"
+        required: true
+        type: choice
+        options:
+          - full
+          - app
+          - db
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ inputs.server_ip }} >> ~/.ssh/known_hosts
+
+      - name: Copy project to VM
+        run: |
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude node_modules --exclude dist --exclude .git \
+            ./ ${{ vars.VPS_USER }}@${{ inputs.server_ip }}:/tmp/master-setup/
+
+      - name: Run setup
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ vars.VPS_USER }}@${{ inputs.server_ip }} \
+            "export VM_ROLE='${{ inputs.role }}' \
+             POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' \
+             JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+             ANON_KEY='${{ vars.SUPABASE_ANON_KEY }}' \
+             SERVICE_ROLE_KEY='${{ secrets.SERVICE_ROLE_KEY }}' \
+             DASHBOARD_USERNAME='${{ secrets.DASHBOARD_USERNAME }}' \
+             DASHBOARD_PASSWORD='${{ secrets.DASHBOARD_PASSWORD }}' \
+             DOMAIN='${{ vars.DOMAIN }}' \
+             CERTBOT_EMAIL='${{ vars.CERTBOT_EMAIL }}' \
+             POSTGRES_HOST='${{ vars.POSTGRES_HOST }}' \
+             FCM_SERVICE_ACCOUNT_JSON='${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}' \
+             && cd /tmp/master-setup && bash deploy/setup.sh"
+
+      - name: Cleanup temp files
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ vars.VPS_USER }}@${{ inputs.server_ip }} \
+            "rm -rf /tmp/master-setup"
+
+      - name: Summary
+        run: |
+          echo "=== VM Provisioned ==="
+          echo "  IP: ${{ inputs.server_ip }}"
+          echo "  Role: ${{ inputs.role }}"
+          echo "  Domain: ${{ vars.DOMAIN }}"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Add ${{ inputs.server_ip }} to APP_SERVERS variable if this is an app server"
+          echo "  2. Push to main to trigger deploy"
