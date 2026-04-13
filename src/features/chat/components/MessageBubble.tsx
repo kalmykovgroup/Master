@@ -32,7 +32,12 @@ function isImage(type?: string | null) {
 function CheckMark({status}: {status?: 'sent' | 'read'}) {
   if (!status) return null;
   const color = status === 'read' ? colors.checkBlue : colors.checkGrey;
-  return <Text style={[styles.check, {color}]}>{'\u2713\u2713'}</Text>;
+  return (
+    <View style={styles.checkWrap}>
+      <Text style={[styles.check, {color}]}>{'\u2713'}</Text>
+      <Text style={[styles.check, styles.checkSecond, {color}]}>{'\u2713'}</Text>
+    </View>
+  );
 }
 
 export function MessageBubble({text, createdAt, isMine, fileName, fileUrl, fileType, fileSize, uploadProgress, status, testID}: MessageBubbleProps) {
@@ -161,8 +166,15 @@ const styles = StyleSheet.create({
   mineTime: {
     color: '#6CC264',
   },
+  checkWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   check: {
     fontSize: 11,
+  },
+  checkSecond: {
+    marginLeft: -4,
   },
   // emoji-only
   emojiContainer: {

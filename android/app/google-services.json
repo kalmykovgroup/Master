@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "963399913555",
+    "project_id": "master-b5b58",
+    "storage_bucket": "master-b5b58.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:963399913555:android:7c49d58fe76686111336a6",
+        "android_client_info": {
+          "package_name": "ru.kalmykov_group"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLpgUgLpXF-pl8Z5y8G-g7rjqKEqJXeXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {Button} from '../../../shared/components/Button';
@@ -37,6 +37,14 @@ export function ProfileForm({profile, masterProfile, isMaster, editable, onSave,
   const [age, setAge] = useState(initial.age);
   const [citizenship, setCitizenship] = useState(initial.citizenship);
   const [workExperience, setWorkExperience] = useState(initial.workExperience);
+
+  useEffect(() => {
+    setDisplayName(initial.displayName);
+    setBio(initial.bio);
+    setAge(initial.age);
+    setCitizenship(initial.citizenship);
+    setWorkExperience(initial.workExperience);
+  }, [initial]);
 
   const isDirty = displayName !== initial.displayName
     || (isMaster && (

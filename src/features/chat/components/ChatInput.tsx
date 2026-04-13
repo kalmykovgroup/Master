@@ -274,9 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',    // прижать к низу (когда текстовое поле растёт вверх)
     paddingHorizontal: 6,
     paddingVertical: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#C6C6C8', // тонкая линия сверху бара
-    backgroundColor: '#F8F8F8',
+    backgroundColor: 'transparent',
     gap: 6,                    // отступ между inputRow и sendBtn
   },
   /* Скруглённая капсула: [☺] [поле ввода] [📎] */
@@ -284,7 +282,7 @@ const styles = StyleSheet.create({
     flex: 1,                   // занять всё доступное пространство (минус sendBtn)
     flexDirection: 'row',      // элементы в строку
     alignItems: 'center',      // центрировать по вертикали (важно для ☺ и 📎)
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.85)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#C6C6C8',
     borderRadius: H / 2,       // скругление = половина высоты → капсула

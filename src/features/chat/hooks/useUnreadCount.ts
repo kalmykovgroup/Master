@@ -6,17 +6,20 @@ import {useUnreadStore} from '../../../stores/unreadStore';
 export function useUnreadCount() {
   const userId = useAuthStore(s => s.session?.user.id);
   const counts = useUnreadStore(s => s.counts);
+  const statuses = useUnreadStore(s => s.conversationStatuses);
   const setCounts = useUnreadStore(s => s.setCounts);
   const increment = useUnreadStore(s => s.increment);
 
   const fetchCounts = useCallback(async () => {
     const {data} = await supabase.rpc('get_unread_counts');
     if (data) {
-      const map: Record<string, number> = {};
+      const countMap: Record<string, number> = {};
+      const statusMap: Record<string, string> = {};
       for (const row of data) {
-        map[row.conversation_id] = row.unread_count;
+        countMap[row.conversation_id] = row.unread_count;
+        statusMap[row.conversation_id] = row.conversation_status;
       }
-      setCounts(map);
+      setCounts(countMap, statusMap);
     }
   }, [setCounts]);
 
@@ -57,6 +60,16 @@ export function useUnreadCount() {
     };
   }, [userId]);
 
-  const totalCount = Object.values(counts).reduce((sum, n) => sum + n, 0);
-  return totalCount;
+  let activeTotal = 0;
+  let archivedTotal = 0;
+  for (const [convId, count] of Object.entries(counts)) {
+    const status = statuses[convId];
+    if (status === 'archived') {
+      archivedTotal += count;
+    } else {
+      activeTotal += count;
+    }
+  }
+
+  return {activeTotal, archivedTotal, counts};
 }

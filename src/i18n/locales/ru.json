@@ -202,6 +202,19 @@
     "updateButton": "Обновить",
     "later": "Позже"
   },
+  "notifications": {
+    "title": "Уведомления",
+    "clientEvents": "Уведомления для клиента",
+    "masterEvents": "Уведомления для мастера",
+    "general": "Общие",
+    "responseReceived": "Новый отклик на заказ",
+    "masterCompleted": "Мастер подтвердил выполнение",
+    "specialOffer": "Спецпредложение",
+    "responseAccepted": "Отклик принят",
+    "responseRejected": "Отклик отклонён",
+    "clientCompleted": "Клиент подтвердил выполнение",
+    "newMessage": "Новое сообщение"
+  },
   "tabs": {
     "orders": "Заказы",
     "feed": "Лента",

@@ -71,12 +71,16 @@ dist/
 
 # Supabase local data & secrets
 supabase/docker/volumes/db/data/
+supabase/docker/volumes/storage/
 supabase/docker/.env
 supabase/docker/secrets.env
 supabase/docker/secrets/
 
 # Windows artifacts
 nul
+
+# Firebase service account (secret)
+**/service-account.json
 
 # Hot Updater
 .env.hotupdater

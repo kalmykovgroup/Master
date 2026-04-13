@@ -188,16 +188,9 @@ export function OrderDetailScreen() {
     refetchOffer();
   };
 
-  const handleChat = async (masterId: string, responseMessage?: string | null) => {
-    const {data: conv, isNew} = await getOrCreate(orderId, masterId);
+  const handleChat = async (masterId: string) => {
+    const {data: conv} = await getOrCreate(orderId, masterId);
     if (conv) {
-      if (isNew && responseMessage) {
-        await supabase.from('messages').insert({
-          conversation_id: conv.id,
-          sender_id: masterId,
-          text: responseMessage,
-        });
-      }
       const tabNav =
         navigation.getParent<NativeStackNavigationProp<UnifiedTabParamList>>();
       tabNav?.navigate('ChatsTab', {
@@ -542,7 +535,7 @@ export function OrderDetailScreen() {
                     userId: item.master_id,
                   })
                 }
-                onChat={() => handleChat(item.master_id, item.message)}
+                onChat={() => handleChat(item.master_id)}
                 onAccept={() => handleAccept(item.id)}
                 onReject={() => handleReject(item.id)}
                 onAcceptOffer={() => {

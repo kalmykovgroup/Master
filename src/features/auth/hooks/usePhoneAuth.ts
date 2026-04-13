@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {supabase} from '../../../config/supabase';
 import {useAuthStore} from '../../../stores/authStore';
 import {normalizePhone} from '../../../shared/utils/formatPhone';
+import {unregisterDeviceToken} from '../../../shared/services/pushNotifications';
 import type {UserRole} from '../../../config/constants';
 
 export function usePhoneAuth() {
@@ -66,8 +67,9 @@ export function usePhoneAuth() {
   };
 
   const signOut = async () => {
+    await unregisterDeviceToken();
     await supabase.auth.signOut();
-    useAuthStore.getState().reset();
+    // onAuthStateChange in RootNavigator handles clearSession()
   };
 
   return {loading, error, sendOtp, verifyOtp, setRole, signOut};

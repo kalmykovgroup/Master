@@ -1,4 +1,4 @@
-import {useCallback, useEffect} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {supabase} from '../../../config/supabase';
 import {useAuthStore} from '../../../stores/authStore';
 import {useSupabaseQuery} from '../../../shared/hooks/useSupabaseQuery';
@@ -17,6 +17,9 @@ export function useMyOrders() {
     [userId],
   );
 
+  const refetchRef = useRef(query.refetch);
+  refetchRef.current = query.refetch;
+
   // Realtime: заказы + отклики + спец-предложения
   useEffect(() => {
     if (!userId) return;
@@ -30,7 +33,7 @@ export function useMyOrders() {
           table: 'orders',
           filter: `client_id=eq.${userId}`,
         },
-        () => query.refetch(),
+        () => refetchRef.current(),
       )
       .on(
         'postgres_changes',
@@ -39,7 +42,7 @@ export function useMyOrders() {
           schema: 'public',
           table: 'responses',
         },
-        () => query.refetch(),
+        () => refetchRef.current(),
       )
       .on(
         'postgres_changes',
@@ -49,14 +52,14 @@ export function useMyOrders() {
           table: 'special_offers',
           filter: `client_id=eq.${userId}`,
         },
-        () => query.refetch(),
+        () => refetchRef.current(),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, query.refetch]);
+  }, [userId]);
 
   return query;
 }
@@ -75,6 +78,9 @@ export function useMasterOrders() {
     [userId],
   );
 
+  const refetchRef = useRef(query.refetch);
+  refetchRef.current = query.refetch;
+
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -87,31 +93,53 @@ export function useMasterOrders() {
           table: 'orders',
           filter: `assigned_master_id=eq.${userId}`,
         },
-        () => query.refetch(),
+        () => refetchRef.current(),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, query.refetch]);
+  }, [userId]);
 
   return query;
 }
 
-export function useOrderFeed(categories?: string[]) {
-  const catKey = categories && categories.length > 0 ? categories.join(',') : '';
+export interface FeedFilter {
+  categories?: string[];
+  budgetMin?: number;
+  budgetMax?: number;
+  location?: string;
+}
+
+export function useOrderFeed(filter?: FeedFilter) {
+  const catKey = filter?.categories?.join(',') ?? '';
+  const bMinKey = filter?.budgetMin ?? '';
+  const bMaxKey = filter?.budgetMax ?? '';
+  const locKey = filter?.location ?? '';
   const query = useSupabaseQuery(() => {
     let q = supabase
       .from('orders')
       .select('*')
       .in('status', ['open', 'in_progress'])
       .order('created_at', {ascending: false});
-    if (categories && categories.length > 0) {
-      q = q.in('category', categories);
+    if (filter?.categories && filter.categories.length > 0) {
+      q = q.in('category', filter.categories);
+    }
+    if (filter?.budgetMin != null) {
+      q = q.gte('budget_max', filter.budgetMin);
+    }
+    if (filter?.budgetMax != null) {
+      q = q.lte('budget_min', filter.budgetMax);
+    }
+    if (filter?.location) {
+      q = q.ilike('location', `%${filter.location}%`);
     }
     return q;
-  }, [catKey]);
+  }, [catKey, bMinKey, bMaxKey, locKey]);
+
+  const feedRefetchRef = useRef(query.refetch);
+  feedRefetchRef.current = query.refetch;
 
   // Realtime: новые заказы в ленте
   useEffect(() => {
@@ -124,14 +152,14 @@ export function useOrderFeed(categories?: string[]) {
           schema: 'public',
           table: 'orders',
         },
-        () => query.refetch(),
+        () => feedRefetchRef.current(),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [query.refetch]);
+  }, []);
 
   return query;
 }
@@ -141,6 +169,9 @@ export function useOrderDetail(orderId: string) {
     () => supabase.from('orders').select('*').eq('id', orderId).single(),
     [orderId],
   );
+
+  const detailRefetchRef = useRef(query.refetch);
+  detailRefetchRef.current = query.refetch;
 
   // Realtime: обновления конкретного заказа
   useEffect(() => {
@@ -154,14 +185,14 @@ export function useOrderDetail(orderId: string) {
           table: 'orders',
           filter: `id=eq.${orderId}`,
         },
-        () => query.refetch(),
+        () => detailRefetchRef.current(),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orderId, query.refetch]);
+  }, [orderId]);
 
   return query;
 }

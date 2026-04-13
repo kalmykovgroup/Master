@@ -355,6 +355,70 @@ export interface Database {
           created_at?: string;
         };
       };
+      device_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token?: string;
+          platform?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      notification_settings: {
+        Row: {
+          user_id: string;
+          response_received: boolean;
+          master_completed: boolean;
+          special_offer: boolean;
+          response_accepted: boolean;
+          response_rejected: boolean;
+          client_completed: boolean;
+          new_message: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          response_received?: boolean;
+          master_completed?: boolean;
+          special_offer?: boolean;
+          response_accepted?: boolean;
+          response_rejected?: boolean;
+          client_completed?: boolean;
+          new_message?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          response_received?: boolean;
+          master_completed?: boolean;
+          special_offer?: boolean;
+          response_accepted?: boolean;
+          response_rejected?: boolean;
+          client_completed?: boolean;
+          new_message?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -392,6 +456,8 @@ export type Review = Tables<'reviews'>;
 export type SpecialOffer = Tables<'special_offers'>;
 export type SavedFilter = Tables<'saved_filters'>;
 export type AppVersion = Tables<'app_versions'>;
+export type DeviceToken = Tables<'device_tokens'>;
+export type NotificationSettings = Tables<'notification_settings'>;
 
 export interface PendingUploadMessage {
   id: string;

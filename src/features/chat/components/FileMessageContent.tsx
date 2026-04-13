@@ -3,6 +3,7 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {FileText, Download, Check} from 'lucide-react-native';
 import {formatFileSize} from '../../../shared/utils/formatFileSize';
 import {colors} from '../../../config/colors';
+import {SUPABASE_ANON_KEY} from '../../../config/supabase';
 
 interface FileMessageContentProps {
   fileUrl: string | null;
@@ -61,6 +62,7 @@ export function FileMessageContent({
     };
 
     xhr.open('GET', fileUrl);
+    xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
     xhr.send();
   }, [fileUrl, status]);
 

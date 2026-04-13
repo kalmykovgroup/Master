@@ -1,5 +1,5 @@
 import React from 'react';
-import {FlatList, StyleSheet, Text, View} from 'react-native';
+import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -28,7 +28,7 @@ function ProfileField({label, value}: {label: string; value: string | null | und
   );
 }
 
-export function SpecialistProfileScreen({route}: Props) {
+export function SpecialistProfileScreen({route, navigation}: Props) {
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const {userId} = route.params;
@@ -48,6 +48,14 @@ export function SpecialistProfileScreen({route}: Props) {
   return (
     <ScreenWrapper>
       <View style={[styles.container, {paddingTop: insets.top}]}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>{'\u2190'}</Text>
+          </Pressable>
+          <Text style={styles.topBarTitle} numberOfLines={1}>
+            {profile?.display_name ?? t('specialists.title')}
+          </Text>
+        </View>
         <FlatList
           ListHeaderComponent={
             <View style={styles.header}>
@@ -98,6 +106,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator,
+  },
+  backBtn: {
+    padding: 4,
+    marginRight: 8,
+  },
+  backBtnText: {
+    fontSize: 22,
+    color: colors.primary,
+  },
+  topBarTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
   },
   header: {
     paddingVertical: 20,

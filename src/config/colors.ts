@@ -2,8 +2,13 @@
  * Telegram-style color palette (iOS)
  */
 export const colors = {
-  // Primary
+  // Role-based accent (single source of truth)
+  clientAccent: '#007AFF',
+  masterAccent: '#0055CC',
+
+  // Primary (alias — use accent() for role-aware code)
   primary: '#007AFF',
+  primaryDark: '#0055CC',
   primaryLight: '#E5F1FF',
 
   // Text

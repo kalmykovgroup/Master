@@ -1,11 +1,12 @@
-import {useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {supabase} from '../../../config/supabase';
 import {useAuthStore} from '../../../stores/authStore';
 import {useSupabaseQuery} from '../../../shared/hooks/useSupabaseQuery';
+import {useUnreadStore} from '../../../stores/unreadStore';
 
 let channelCounter = 0;
 
-export function useConversations() {
+export function useConversations(status: 'active' | 'archived' = 'active') {
   const userId = useAuthStore(s => s.session?.user.id);
   const role = useAuthStore(s => s.role);
   const channelId = useRef(++channelCounter);
@@ -18,15 +19,16 @@ export function useConversations() {
         '*, client:profiles!client_id(*), master:profiles!master_id(*), order:orders!order_id(title)',
       )
       .eq(column, userId!)
+      .eq('status', status)
       .order('last_message_at', {ascending: false, nullsFirst: false});
-  }, [userId, role]);
+  }, [userId, role, status]);
 
   // Realtime: обновление списка при новом сообщении (last_message_at меняется)
   useEffect(() => {
     if (!userId) return;
     const column = role === 'client' ? 'client_id' : 'master_id';
     const channel = supabase
-      .channel(`conversations-${userId}-${channelId.current}`)
+      .channel(`conversations-${userId}-${status}-${channelId.current}`)
       .on(
         'postgres_changes',
         {
@@ -42,9 +44,29 @@ export function useConversations() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, role, query.refetch]);
+  }, [userId, role, status, query.refetch]);
 
   return query;
+}
+
+export function useArchiveConversation() {
+  const setConversationStatus = useUnreadStore(s => s.setConversationStatus);
+
+  const archiveConversation = useCallback(
+    async (conversationId: string, newStatus: 'active' | 'archived') => {
+      const {error} = await supabase
+        .from('conversations')
+        .update({status: newStatus})
+        .eq('id', conversationId);
+      if (!error) {
+        setConversationStatus(conversationId, newStatus);
+      }
+      return {error: error?.message ?? null};
+    },
+    [setConversationStatus],
+  );
+
+  return {archiveConversation};
 }
 
 export function useGetOrCreateConversation() {
@@ -63,6 +85,12 @@ export function useGetOrCreateConversation() {
       .single();
 
     if (existing) {
+      if (existing.status === 'pending') {
+        await supabase
+          .from('conversations')
+          .update({status: 'active'})
+          .eq('id', existing.id);
+      }
       return {data: existing, isNew: false, error: null};
     }
 

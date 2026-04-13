@@ -8,6 +8,7 @@ export type AuthStackParamList = {
 export type OrderFeedStackParamList = {
   OrderFeed: undefined;
   OrderDetail: {orderId: string};
+  CreateFilter: undefined;
 };
 
 export type ClientOrdersStackParamList = {
@@ -39,6 +40,7 @@ export type ProfileStackParamList = {
   ReviewsList: {userId: string};
   MyResponses: undefined;
   MasterOnboarding: undefined;
+  NotificationSettings: undefined;
 };
 
 export type UnifiedTabParamList = {

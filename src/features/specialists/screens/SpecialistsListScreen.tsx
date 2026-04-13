@@ -1,5 +1,5 @@
-import React, {useMemo} from 'react';
-import {FlatList, StyleSheet, Text, View} from 'react-native';
+import React from 'react';
+import {ActivityIndicator, FlatList, StyleSheet, Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -22,14 +22,9 @@ export function SpecialistsListScreen() {
   const navigation = useNavigation<Nav>();
   const role = useAuthStore(s => s.role);
   const userId = useAuthStore(s => s.session?.user.id);
-  const {data, loading, refetch} = useSpecialists();
+  const {data, loading, loadingMore, hasMore, loadMore, refetch} = useSpecialists();
   const {updateActivity} = useUpdateActivity();
   const [updating, setUpdating] = React.useState(false);
-
-  const masters = useMemo(() => {
-    if (!data || !Array.isArray(data)) return null;
-    return data.filter((item: SpecialistItem) => item.profile?.role === 'master');
-  }, [data]);
 
   const handleLookingForOrders = async () => {
     setUpdating(true);
@@ -38,7 +33,7 @@ export function SpecialistsListScreen() {
     refetch();
   };
 
-  if (loading && !data) {
+  if (loading && data.length === 0) {
     return <LoadingScreen />;
   }
 
@@ -56,7 +51,7 @@ export function SpecialistsListScreen() {
           </View>
         )}
         <FlatList
-          data={masters as SpecialistItem[] | null}
+          data={data as SpecialistItem[]}
           keyExtractor={item => item.user_id}
           renderItem={({item}) => (
             <SpecialistCard
@@ -73,6 +68,15 @@ export function SpecialistsListScreen() {
           }
           onRefresh={refetch}
           refreshing={loading}
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footer}>
+                <ActivityIndicator size="small" />
+              </View>
+            ) : null
+          }
         />
       </View>
     </ScreenWrapper>
@@ -98,5 +102,9 @@ const styles = StyleSheet.create({
   },
   list: {
     flexGrow: 1,
+  },
+  footer: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });

@@ -2,20 +2,21 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import type {ViewToken} from 'react-native';
 import {useTranslation} from 'react-i18next';
-import {useConversations, fetchLastMessage} from '../hooks/useConversations';
+import {useConversations, useArchiveConversation, fetchLastMessage} from '../hooks/useConversations';
 import {useMessages} from '../hooks/useMessages';
 import {useMarkAsRead} from '../hooks/useMarkAsRead';
 import {useFileUpload} from '../hooks/useFileUpload';
 import {useAuthStore} from '../../../stores/authStore';
 import {useUnreadStore} from '../../../stores/unreadStore';
+import {useUnreadCount} from '../hooks/useUnreadCount';
 import {ConversationItem} from '../components/ConversationItem';
 import {MessageBubble} from '../components/MessageBubble';
 import {ChatInput} from '../components/ChatInput';
 import {EmptyState} from '../../../shared/components/EmptyState';
 import {supabase} from '../../../config/supabase';
+import {colors} from '../../../config/colors';
 import type {Message, DisplayMessage, PendingUploadMessage} from '../../../types/database';
 
-const chatBgImage = require('../../../assets/chat-bg.jpg');
 
 const SPLIT_BREAKPOINT = 600;
 
@@ -28,20 +29,24 @@ function ChatPanel({
   conversationId,
   title,
   onBack,
+  onArchive,
+  isArchived,
 }: {
   conversationId: string;
   title: string;
   onBack?: () => void;
+  onArchive?: () => void;
+  isArchived?: boolean;
 }) {
   const {t} = useTranslation();
   const userId = useAuthStore(s => s.session?.user.id);
-  const role = useAuthStore(s => s.role);
   const {messages, loading, sendMessage, sendFileMessage} = useMessages(conversationId);
   const listRef = useRef<FlatList>(null);
   const [chatBlocked, setChatBlocked] = useState(false);
   const [pendingUploads, setPendingUploads] = useState<PendingUploadMessage[]>([]);
   const {uploadFile} = useFileUpload();
   const markRead = useMarkAsRead(conversationId);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Stable refs for viewability callback
   const markReadRef = useRef(markRead);
@@ -63,7 +68,7 @@ function ChatPanel({
   ).current;
 
   useEffect(() => {
-    if (role !== 'master' || !userId) return;
+    if (!userId) return;
     (async () => {
       const {data: conv} = await supabase
         .from('conversations')
@@ -83,7 +88,7 @@ function ChatPanel({
         setChatBlocked(false);
       }
     })();
-  }, [conversationId, userId, role]);
+  }, [conversationId, userId]);
 
   const handleSendFileStart = useCallback(
     (file: File, text: string | null) => {
@@ -127,6 +132,15 @@ function ChatPanel({
 
   const displayMessages: DisplayMessage[] = [...messages, ...pendingUploads];
 
+  // Auto-scroll when new messages arrive
+  const prevCount = useRef(0);
+  useEffect(() => {
+    if (displayMessages.length > prevCount.current) {
+      setTimeout(() => listRef.current?.scrollToEnd({animated: true}), 50);
+    }
+    prevCount.current = displayMessages.length;
+  }, [displayMessages.length]);
+
   return (
     <View style={styles.chatPanel}>
       <View style={styles.chatHeader}>
@@ -136,44 +150,68 @@ function ChatPanel({
           </Pressable>
         )}
         <Text style={styles.chatHeaderTitle} numberOfLines={1}>{title}</Text>
+        {onArchive && (
+          <View style={styles.menuContainer}>
+            <Pressable onPress={() => setShowMenu(!showMenu)} style={styles.menuBtn}>
+              <Text style={styles.menuBtnText}>{'\u22EE'}</Text>
+            </Pressable>
+            {showMenu && (
+              <View style={styles.dropdown}>
+                <Pressable
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    onArchive();
+                  }}>
+                  <Text style={styles.dropdownText}>
+                    {isArchived ? t('chat.fromArchive') : t('chat.toArchive')}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        )}
       </View>
       <View style={styles.chatBg as any}>
-        <FlatList
-          ref={listRef}
-          data={displayMessages}
-          keyExtractor={item => item.id}
-          renderItem={({item}: {item: DisplayMessage}) => {
-            const isUploading = '_uploading' in item;
-            return (
-              <MessageBubble
-                text={item.text}
-                createdAt={item.created_at}
-                isMine={item.sender_id === userId}
-                fileName={item.file_name}
-                fileUrl={item.file_url}
-                fileType={item.file_type}
-                fileSize={item.file_size}
-                uploadProgress={isUploading ? item._progress : undefined}
-                status={item.sender_id === userId ? (item.read_at ? 'read' : 'sent') : undefined}
-              />
-            );
-          }}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState message={t('chat.noMessages')} />}
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({animated: false})
-          }
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-        />
-      </View>
-      {chatBlocked ? (
-        <View style={styles.blockedBar}>
-          <Text style={styles.blockedText}>{t('orders.chatBlocked')}</Text>
+        <View style={styles.centerColumn}>
+          <FlatList
+            ref={listRef}
+            data={displayMessages}
+            keyExtractor={item => item.id}
+            renderItem={({item}: {item: DisplayMessage}) => {
+              const isUploading = '_uploading' in item;
+              return (
+                <MessageBubble
+                  text={item.text}
+                  createdAt={item.created_at}
+                  isMine={item.sender_id === userId}
+                  fileName={item.file_name}
+                  fileUrl={item.file_url}
+                  fileType={item.file_type}
+                  fileSize={item.file_size}
+                  uploadProgress={isUploading ? item._progress : undefined}
+                  status={item.sender_id === userId ? (item.read_at ? 'read' : 'sent') : undefined}
+                />
+              );
+            }}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<EmptyState message={t('chat.noMessages')} />}
+            onContentSizeChange={() =>
+              listRef.current?.scrollToEnd({animated: false})
+            }
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+          />
+
+          {chatBlocked ? (
+            <View style={styles.blockedBar}>
+              <Text style={styles.blockedText}>{t('chat.chatClosed')}</Text>
+            </View>
+          ) : (
+            <ChatInput onSend={sendMessage} onSendFileStart={handleSendFileStart} />
+          )}
         </View>
-      ) : (
-        <ChatInput onSend={sendMessage} onSendFileStart={handleSendFileStart} />
-      )}
+      </View>
     </View>
   );
 }
@@ -185,6 +223,11 @@ function ConversationList({
   lastMessages,
   selected,
   onSelect,
+  showArchived,
+  onToggleArchived,
+  onArchive,
+  onLongPress,
+  archivedTotal,
 }: {
   data: any[] | null;
   loading: boolean;
@@ -192,6 +235,11 @@ function ConversationList({
   lastMessages: Record<string, string>;
   selected: SelectedChat | null;
   onSelect: (chat: SelectedChat) => void;
+  showArchived: boolean;
+  onToggleArchived: () => void;
+  onArchive: (id: string) => void;
+  onLongPress: (id: string) => void;
+  archivedTotal: number;
 }) {
   const {t} = useTranslation();
   const role = useAuthStore(s => s.role);
@@ -199,7 +247,16 @@ function ConversationList({
 
   return (
     <>
-      <Text style={styles.title}>{t('chat.chats')}</Text>
+      <View style={styles.listHeader}>
+        {showArchived && (
+          <Pressable onPress={onToggleArchived} style={styles.listBackBtn}>
+            <Text style={styles.listBackText}>{'\u2190'}</Text>
+          </Pressable>
+        )}
+        <Text style={styles.title}>
+          {showArchived ? t('chat.archived') : t('chat.chats')}
+        </Text>
+      </View>
       <FlatList
         data={data}
         keyExtractor={item => item.id}
@@ -215,13 +272,32 @@ function ConversationList({
               lastMessage={lastMessages[item.id]}
               unreadCount={counts[item.id] ?? 0}
               active={selected?.conversationId === item.id}
+              isArchived={showArchived}
               onPress={() =>
                 onSelect({conversationId: item.id, title: name})
               }
+              onArchive={() => onArchive(item.id)}
+              onLongPress={() => onLongPress(item.id)}
             />
           );
         }}
-        ListEmptyComponent={<EmptyState message={t('chat.noChats')} />}
+        ListEmptyComponent={
+          <EmptyState
+            message={showArchived ? t('chat.noArchivedChats') : t('chat.noChats')}
+          />
+        }
+        ListFooterComponent={
+          !showArchived ? (
+            <Pressable style={styles.archiveListBtn} onPress={onToggleArchived}>
+              <Text style={styles.archiveListBtnText}>{t('chat.archive')}</Text>
+              {archivedTotal > 0 && (
+                <View style={styles.archiveBadge}>
+                  <Text style={styles.archiveBadgeText}>{archivedTotal}</Text>
+                </View>
+              )}
+            </Pressable>
+          ) : null
+        }
         onRefresh={refetch}
         refreshing={loading}
       />
@@ -232,9 +308,15 @@ function ConversationList({
 export function ChatWebLayout() {
   const {t} = useTranslation();
   const {width} = useWindowDimensions();
-  const {data, loading, refetch} = useConversations();
+  const {archivedTotal} = useUnreadCount();
+  const [showArchived, setShowArchived] = useState(false);
+  const {data, loading, refetch} = useConversations(
+    showArchived ? 'archived' : 'active',
+  );
+  const {archiveConversation} = useArchiveConversation();
   const [lastMessages, setLastMessages] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<SelectedChat | null>(null);
+  const [menuConvId, setMenuConvId] = useState<string | null>(null);
 
   const isSplit = width >= SPLIT_BREAKPOINT;
 
@@ -257,6 +339,21 @@ export function ChatWebLayout() {
     }
   }, [data, loadLastMessages]);
 
+  const handleArchive = async (conversationId: string) => {
+    const newStatus = showArchived ? 'active' : 'archived';
+    await archiveConversation(conversationId, newStatus);
+    setMenuConvId(null);
+    if (selected?.conversationId === conversationId) {
+      setSelected(null);
+    }
+    refetch();
+  };
+
+  const toggleArchived = () => {
+    setShowArchived(prev => !prev);
+    setSelected(null);
+  };
+
   // Narrow screen — mobile-like layout
   if (!isSplit) {
     if (selected) {
@@ -267,6 +364,8 @@ export function ChatWebLayout() {
             conversationId={selected.conversationId}
             title={selected.title}
             onBack={() => setSelected(null)}
+            onArchive={() => handleArchive(selected.conversationId)}
+            isArchived={showArchived}
           />
         </View>
       );
@@ -280,7 +379,33 @@ export function ChatWebLayout() {
           lastMessages={lastMessages}
           selected={selected}
           onSelect={setSelected}
+          showArchived={showArchived}
+          onToggleArchived={toggleArchived}
+          onArchive={handleArchive}
+          onLongPress={setMenuConvId}
+          archivedTotal={archivedTotal}
         />
+        {/* Context menu (no Modal to avoid aria-hidden) */}
+        {!!menuConvId && (
+          <Pressable style={styles.overlay} onPress={() => setMenuConvId(null)}>
+            <View style={styles.menuCard}>
+              <Pressable
+                style={styles.menuItem}
+                onPress={() => menuConvId && handleArchive(menuConvId)}>
+                <Text style={styles.menuItemText}>
+                  {showArchived ? t('chat.fromArchive') : t('chat.toArchive')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.menuItem, styles.menuItemLast]}
+                onPress={() => setMenuConvId(null)}>
+                <Text style={[styles.menuItemText, styles.cancelText]}>
+                  {t('common.cancel')}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -296,6 +421,11 @@ export function ChatWebLayout() {
           lastMessages={lastMessages}
           selected={selected}
           onSelect={setSelected}
+          showArchived={showArchived}
+          onToggleArchived={toggleArchived}
+          onArchive={handleArchive}
+          onLongPress={setMenuConvId}
+          archivedTotal={archivedTotal}
         />
       </View>
 
@@ -304,6 +434,8 @@ export function ChatWebLayout() {
           key={selected.conversationId}
           conversationId={selected.conversationId}
           title={selected.title}
+          onArchive={() => handleArchive(selected.conversationId)}
+          isArchived={showArchived}
         />
       ) : (
         <View style={styles.emptyPanel}>
@@ -311,6 +443,28 @@ export function ChatWebLayout() {
             <Text style={styles.emptyText}>{t('chat.selectChat')}</Text>
           </View>
         </View>
+      )}
+
+      {/* Context menu (no Modal to avoid aria-hidden) */}
+      {!!menuConvId && (
+        <Pressable style={styles.overlay} onPress={() => setMenuConvId(null)}>
+          <View style={styles.menuCard}>
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => menuConvId && handleArchive(menuConvId)}>
+              <Text style={styles.menuItemText}>
+                {showArchived ? t('chat.fromArchive') : t('chat.toArchive')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.menuItem, styles.menuItemLast]}
+              onPress={() => setMenuConvId(null)}>
+              <Text style={[styles.menuItemText, styles.cancelText]}>
+                {t('common.cancel')}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
       )}
     </View>
   );
@@ -322,7 +476,7 @@ const styles = StyleSheet.create({
   },
   mobileRoot: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
   },
   splitRoot: {
     flex: 1,
@@ -330,21 +484,59 @@ const styles = StyleSheet.create({
   },
   leftPanel: {
     width: 340,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: '#C6C6C8',
+    borderRightColor: colors.separator,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000000',
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
   },
+  listBackBtn: {
+    marginRight: 8,
+    padding: 4,
+  },
+  listBackText: {
+    fontSize: 22,
+    color: colors.primary,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  archiveListBtn: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  archiveListBtnText: {
+    fontSize: 15,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  archiveBadge: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  archiveBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   chatPanel: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
   },
   chatHeader: {
     flexDirection: 'row',
@@ -352,8 +544,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#C6C6C8',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: colors.separator,
+    backgroundColor: colors.bg,
   },
   backButton: {
     marginRight: 8,
@@ -364,21 +556,60 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 28,
-    color: '#007AFF',
+    color: colors.primary,
     lineHeight: 28,
     marginTop: -2,
   },
   chatHeaderTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000000',
+    color: colors.text,
     flex: 1,
+  },
+  menuContainer: {
+    position: 'relative',
+  },
+  menuBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuBtnText: {
+    fontSize: 20,
+    color: colors.textSecondary,
+  },
+  dropdown: {
+    position: 'absolute',
+    top: 34,
+    right: 0,
+    backgroundColor: colors.bg,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    minWidth: 140,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: colors.text,
   },
   chatBg: {
     flex: 1,
-    backgroundImage: `url(${chatBgImage})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    backgroundImage: 'linear-gradient(180deg, #D1E8FF 0%, #E8F0FE 40%, #F7ECDE 100%)',
+    alignItems: 'center',
+  },
+  centerColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 700,
   },
   list: {
     padding: 12,
@@ -394,7 +625,7 @@ const styles = StyleSheet.create({
   },
   blockedText: {
     fontSize: 14,
-    color: '#FF3B30',
+    color: colors.red,
     fontWeight: '500',
   },
   emptyPanel: {
@@ -402,19 +633,52 @@ const styles = StyleSheet.create({
   },
   emptyBg: {
     flex: 1,
-    backgroundImage: `url(${chatBgImage})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    backgroundImage: 'linear-gradient(180deg, #D1E8FF 0%, #E8F0FE 40%, #F7ECDE 100%)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: colors.textSecondary,
     backgroundColor: 'rgba(255,255,255,0.8)',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  // Context menu
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  menuCard: {
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    width: 260,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.separator,
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  cancelText: {
+    color: colors.textSecondary,
   },
 });

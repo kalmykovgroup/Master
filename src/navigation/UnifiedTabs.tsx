@@ -4,6 +4,7 @@ import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
 import {useAuthStore} from '../stores/authStore';
+import {useAccent} from '../shared/hooks/useAccent';
 import {useUnreadCount} from '../features/chat/hooks/useUnreadCount';
 import {useNewMasterOrdersCount, useNewClientResponsesCount} from '../features/orders/hooks/useOrderBadges';
 
@@ -23,9 +24,11 @@ import {OrderDetailScreen} from '../features/orders/screens/OrderDetailScreen';
 import {SpecialistsListScreen} from '../features/specialists/screens/SpecialistsListScreen';
 import {SpecialistProfileScreen} from '../features/specialists/screens/SpecialistProfileScreen';
 import {OrderFeedScreen} from '../features/orders/screens/OrderFeedScreen';
+import {CreateFilterScreen} from '../features/orders/screens/CreateFilterScreen';
 import {ResponsesListScreen} from '../features/orders/screens/ResponsesListScreen';
 import {EditOrderScreen} from '../features/orders/screens/EditOrderScreen';
 import {MasterOrdersScreen} from '../features/orders/screens/MasterOrdersScreen';
+import {NotificationSettingsScreen} from '../features/profile/screens/NotificationSettingsScreen';
 
 import type {
   UnifiedTabParamList,
@@ -57,6 +60,7 @@ function ProfileNavigator() {
       <ProfileStack.Screen name="ReviewsList" component={ReviewsListScreen} />
       <ProfileStack.Screen name="MyResponses" component={MyResponsesScreen} />
       <ProfileStack.Screen name="MasterOnboarding" component={MasterOnboardingScreen} />
+      <ProfileStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     </ProfileStack.Navigator>
   );
 }
@@ -139,6 +143,10 @@ function OrderFeedNavigator() {
         name="OrderDetail"
         component={OrderDetailScreen}
       />
+      <OrderFeedStack.Screen
+        name="CreateFilter"
+        component={CreateFilterScreen}
+      />
     </OrderFeedStack.Navigator>
   );
 }
@@ -146,7 +154,8 @@ function OrderFeedNavigator() {
 export function UnifiedTabs() {
   const {t} = useTranslation();
   const role = useAuthStore(s => s.role);
-  const unreadCount = useUnreadCount();
+  const accentColor = useAccent();
+  const {activeTotal} = useUnreadCount();
   const {count: masterBadge} = useNewMasterOrdersCount();
   const {count: clientBadge} = useNewClientResponsesCount();
 
@@ -157,7 +166,7 @@ export function UnifiedTabs() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#FFFFFF',
-        tabBarActiveBackgroundColor: '#007AFF',
+        tabBarActiveBackgroundColor: accentColor,
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
@@ -195,7 +204,7 @@ export function UnifiedTabs() {
           name="MasterOrdersTab"
           component={MasterOrdersNavigator}
           options={{
-            tabBarLabel: t('tabs.inProgress'),
+            tabBarLabel: t('tabs.responses'),
             tabBarBadge: masterBadge > 0 ? masterBadge : undefined,
             tabBarBadgeStyle: styles.tabBadge,
           }}
@@ -206,7 +215,7 @@ export function UnifiedTabs() {
         component={ChatsNavigator}
         options={{
           tabBarLabel: t('tabs.chats'),
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadge: activeTotal > 0 ? activeTotal : undefined,
           tabBarBadgeStyle: styles.tabBadge,
         }}
       />

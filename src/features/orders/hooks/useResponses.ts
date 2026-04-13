@@ -111,6 +111,47 @@ export function useCreateResponse() {
         return {data: null, error: error.message};
       }
 
+      // Автосоздание чата при отклике
+      const {data: order} = await supabase
+        .from('orders')
+        .select('client_id')
+        .eq('id', orderId)
+        .single();
+
+      if (order) {
+        // Проверяем, не существует ли уже чат
+        const {data: existingConv} = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('order_id', orderId)
+          .eq('master_id', userId)
+          .maybeSingle();
+
+        let convId = existingConv?.id;
+        if (!convId) {
+          const {data: newConv} = await supabase
+            .from('conversations')
+            .insert({
+              order_id: orderId,
+              client_id: order.client_id,
+              master_id: userId,
+              status: 'pending',
+            })
+            .select('id')
+            .single();
+          convId = newConv?.id;
+        }
+
+        // Первое сообщение — текст отклика (только для нового чата)
+        if (convId && message && !existingConv) {
+          await supabase.from('messages').insert({
+            conversation_id: convId,
+            sender_id: userId,
+            text: message,
+          });
+        }
+      }
+
       return {data, error: null};
     },
     [userId],
@@ -156,6 +197,13 @@ export function useUpdateResponseStatus() {
           .eq('order_id', orderId)
           .eq('status', 'pending')
           .neq('id', responseId);
+
+        // Activate conversation for the accepted master
+        await supabase
+          .from('conversations')
+          .update({status: 'active'})
+          .eq('order_id', orderId)
+          .eq('master_id', masterId);
       }
 
       return {data, error: null};

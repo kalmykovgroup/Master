@@ -3,6 +3,7 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {supabase} from '../config/supabase';
 import {useAuthStore} from '../stores/authStore';
+import {usePushNotifications} from '../shared/hooks/usePushNotifications';
 import {LoadingScreen} from '../shared/components/LoadingScreen';
 import {AuthStack} from './AuthStack';
 import {UnifiedTabs} from './UnifiedTabs';
@@ -93,6 +94,7 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
+      <PushNotificationHandler />
       <Stack.Navigator screenOptions={{headerShown: false}}>
         {!session || !role ? (
           <Stack.Screen name="Auth" component={AuthStack} />
@@ -102,4 +104,9 @@ export function RootNavigator() {
       </Stack.Navigator>
     </NavigationContainer>
   );
+}
+
+function PushNotificationHandler() {
+  usePushNotifications();
+  return null;
 }

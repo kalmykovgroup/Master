@@ -7,5 +7,7 @@ module.exports = {
   ],
   moduleNameMapper: {
     '@hot-updater/react-native': '<rootDir>/src/shared/mocks/hot-updater.js',
+    '@react-native-firebase/messaging': '<rootDir>/src/shared/mocks/firebase-messaging.js',
+    '@react-native-firebase/app': '<rootDir>/src/shared/mocks/firebase-app.js',
   },
 };

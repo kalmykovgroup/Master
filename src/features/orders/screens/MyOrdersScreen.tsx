@@ -70,7 +70,7 @@ export function MyOrdersScreen() {
             style={styles.addBtn}
             onPress={() => navigation.navigate('CreateOrder')}
             testID="create-order-btn">
-            <Text style={styles.addBtnText}>+</Text>
+            <Text style={styles.addBtnText}>{t('orders.create')}</Text>
           </Pressable>
         </View>
         <View style={styles.filters}>
@@ -159,17 +159,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   addBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 14,
     backgroundColor: '#007AFF',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   addBtnText: {
-    fontSize: 22,
-    fontWeight: '400',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#FFFFFF',
-    marginTop: -1,
   },
 });

@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {HotUpdater} from '@hot-updater/react-native';
+import {HotUpdater} from './src/shared/utils/hotUpdater';
 import {ErrorBoundary} from './src/shared/components/ErrorBoundary';
 import {RootNavigator} from './src/navigation/RootNavigator';
 import {UpdateDialog} from './src/shared/components/UpdateDialog';
