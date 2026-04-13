@@ -88,12 +88,12 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key $TARGET "bash /opt/master/deploy/migrate.sh"
 
-      - name: Rebuild and restart services
+      - name: Restart services
         env:
           TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
         run: |
           ssh -i ~/.ssh/deploy_key $TARGET \
             "cd /opt/master/supabase/docker && \
-             sudo docker compose build functions && \
              sudo docker compose up -d functions && \
+             sudo docker compose restart functions && \
              sudo nginx -t && sudo systemctl reload nginx"

@@ -132,11 +132,9 @@ COMPOSE_FILE="/opt/master/supabase/docker/docker-compose.yml"
 
 case "$VM_ROLE" in
   full)
-    sudo docker compose -f "$COMPOSE_FILE" --profile full up -d --build
-    ;;
+    sudo docker compose -f "$COMPOSE_FILE" --profile full up -d     ;;
   app)
-    sudo docker compose -f "$COMPOSE_FILE" up -d --build
-    ;;
+    sudo docker compose -f "$COMPOSE_FILE" up -d     ;;
   db)
     sudo docker compose -f "$COMPOSE_FILE" --profile db up -d
     ;;
