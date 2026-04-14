@@ -13,9 +13,6 @@ for var in "${REQUIRED_VARS[@]}"; do
     echo "ERROR: $var is not set" >&2
     echo ""
     echo "Usage: export POSTGRES_PASSWORD=... JWT_SECRET=... ANON_KEY=... SERVICE_ROLE_KEY=... DOMAIN=... && bash setup.sh"
-    echo ""
-    echo "Optional vars: VM_ROLE (full|app|db, default: full), POSTGRES_HOST (default: db),"
-    echo "  DASHBOARD_USERNAME, DASHBOARD_PASSWORD, CERTBOT_EMAIL, FCM_SERVICE_ACCOUNT_JSON"
     exit 1
   fi
 done
@@ -25,31 +22,22 @@ DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-changeme}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
 FCM_SERVICE_ACCOUNT_JSON="${FCM_SERVICE_ACCOUNT_JSON:-}"
 
-echo "  Role: $VM_ROLE"
-echo "  Domain: $DOMAIN"
-echo "  DB host: $POSTGRES_HOST"
+echo "  Role: $VM_ROLE | Domain: $DOMAIN | DB: $POSTGRES_HOST"
 
-# --- Phase 0.5: OS update & upgrade ---
-echo "[0/9] Updating OS..."
+# --- Phase 1: OS update & packages ---
+echo "[1/9] Updating OS and installing packages..."
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
-
-# --- Phase 1: Install packages ---
-echo "[1/9] Installing packages..."
 sudo apt-get install -y -qq \
   docker.io docker-compose-plugin \
   nginx certbot python3-certbot-nginx \
   fail2ban ufw
 
 sudo systemctl enable --now docker
-
-# Add current user to docker group (no sudo needed for docker commands after re-login)
 sudo usermod -aG docker "$USER" 2>/dev/null || true
 
-# --- Phase 1.5: Firewall + brute-force protection ---
+# --- Phase 2: Firewall + fail2ban ---
 echo "[2/9] Configuring firewall & fail2ban..."
-
-# UFW: allow only SSH, HTTP, HTTPS
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow ssh
@@ -57,7 +45,6 @@ sudo ufw allow http
 sudo ufw allow https
 sudo ufw --force enable
 
-# fail2ban: protect SSH
 sudo mkdir -p /etc/fail2ban/jail.d
 sudo tee /etc/fail2ban/jail.d/sshd.conf > /dev/null <<'F2B'
 [sshd]
@@ -70,28 +57,42 @@ F2B
 sudo systemctl enable --now fail2ban
 sudo systemctl restart fail2ban
 
-# --- Phase 3: Create directories ---
+# --- Phase 3: Create directory structure ---
 echo "[3/9] Creating directories..."
-sudo mkdir -p /var/www/master/dist
-sudo mkdir -p /opt/master/supabase/docker
-sudo mkdir -p /opt/master/supabase/migrations
-sudo mkdir -p /opt/master/supabase/functions
+sudo mkdir -p /opt/master/releases
+sudo mkdir -p /opt/master/shared/supabase/docker
+sudo mkdir -p /opt/master/shared/supabase/migrations
 sudo mkdir -p /opt/master/deploy
-sudo chown -R "$USER":"$USER" /opt/master /var/www/master
+sudo chown -R "$USER":"$USER" /opt/master
 
 # --- Phase 4: Copy files ---
 echo "[4/9] Copying files..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp "$SCRIPT_DIR"/../supabase/docker/docker-compose.yml /opt/master/supabase/docker/
-cp -r "$SCRIPT_DIR"/../supabase/docker/volumes /opt/master/supabase/docker/ 2>/dev/null || true
-cp -r "$SCRIPT_DIR"/../supabase/functions/* /opt/master/supabase/functions/ 2>/dev/null || true
-cp "$SCRIPT_DIR"/../supabase/migrations/*.sql /opt/master/supabase/migrations/ 2>/dev/null || true
-cp "$SCRIPT_DIR"/migrate.sh /opt/master/deploy/
-chmod +x /opt/master/deploy/migrate.sh
 
-# --- Phase 5: Generate .env from environment ---
+# Docker compose + volumes → shared (persistent)
+cp "$SCRIPT_DIR"/../supabase/docker/docker-compose.yml /opt/master/shared/supabase/docker/
+cp -r "$SCRIPT_DIR"/../supabase/docker/volumes /opt/master/shared/supabase/docker/ 2>/dev/null || true
+
+# Migrations → shared (cumulative)
+cp "$SCRIPT_DIR"/../supabase/migrations/*.sql /opt/master/shared/supabase/migrations/ 2>/dev/null || true
+
+# Deploy scripts
+cp "$SCRIPT_DIR"/*.sh /opt/master/deploy/
+chmod +x /opt/master/deploy/*.sh
+
+# Create initial release from current files
+INIT_RELEASE="initial"
+mkdir -p /opt/master/releases/$INIT_RELEASE/dist
+mkdir -p /opt/master/releases/$INIT_RELEASE/functions
+cp -r "$SCRIPT_DIR"/../supabase/functions/* /opt/master/releases/$INIT_RELEASE/functions/ 2>/dev/null || true
+echo "initial setup" > /opt/master/releases/$INIT_RELEASE/dist/index.html
+
+# Create symlink
+ln -sfn /opt/master/releases/$INIT_RELEASE /opt/master/current
+
+# --- Phase 5: Generate .env ---
 echo "[5/9] Generating .env..."
-cat > /opt/master/supabase/docker/.env <<ENVEOF
+cat > /opt/master/shared/supabase/docker/.env <<ENVEOF
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 ANON_KEY=${ANON_KEY}
@@ -126,15 +127,17 @@ FILE_SIZE_LIMIT=52428800
 FCM_SERVICE_ACCOUNT_JSON=${FCM_SERVICE_ACCOUNT_JSON}
 ENVEOF
 
-# --- Phase 6: Start services ---
+# --- Phase 6: Start Docker services ---
 echo "[6/9] Starting services (role: $VM_ROLE)..."
-COMPOSE_FILE="/opt/master/supabase/docker/docker-compose.yml"
+COMPOSE_FILE="/opt/master/shared/supabase/docker/docker-compose.yml"
 
 case "$VM_ROLE" in
   full)
-    sudo docker compose -f "$COMPOSE_FILE" --profile full up -d     ;;
+    sudo docker compose -f "$COMPOSE_FILE" --profile full up -d
+    ;;
   app)
-    sudo docker compose -f "$COMPOSE_FILE" up -d     ;;
+    sudo docker compose -f "$COMPOSE_FILE" up -d
+    ;;
   db)
     sudo docker compose -f "$COMPOSE_FILE" --profile db up -d
     ;;
@@ -158,7 +161,7 @@ if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "db" ]; then
   echo "  Running migrations..."
   bash /opt/master/deploy/migrate.sh
 else
-  echo "[7/9] Skipping DB wait (role: $VM_ROLE, DB is external)"
+  echo "[7/9] Skipping DB (role: $VM_ROLE)"
 fi
 
 # --- Phase 8: Configure Nginx ---
@@ -184,20 +187,18 @@ if [ "$VM_ROLE" = "full" ] || [ "$VM_ROLE" = "app" ]; then
         --email "$CERTBOT_EMAIL" \
         --redirect
     else
-      echo "[9/9] SSL certificate already exists."
-      sudo systemctl enable --now certbot.timer 2>/dev/null || \
-        (sudo crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet") | sort -u | sudo crontab -
+      echo "[9/9] SSL certificate exists."
+      sudo systemctl enable --now certbot.timer 2>/dev/null || true
     fi
   else
     echo "[9/9] Skipping SSL (CERTBOT_EMAIL not set)"
-    echo "  To add SSL later: sudo certbot --nginx -d $DOMAIN"
   fi
 else
   echo "[9/9] Skipping SSL (role: $VM_ROLE)"
 fi
 
 echo ""
-echo "=== Setup complete (role: $VM_ROLE) ==="
-echo "  Domain: https://$DOMAIN"
-echo "  Firewall: UFW enabled (SSH, HTTP, HTTPS)"
-echo "  Brute-force: fail2ban protecting SSH"
+echo "=== Setup complete ==="
+echo "  Role: $VM_ROLE | Domain: https://$DOMAIN"
+echo "  Firewall: UFW (SSH/HTTP/HTTPS) | fail2ban: SSH"
+echo "  Next: push to main → GitHub Actions will deploy first release"

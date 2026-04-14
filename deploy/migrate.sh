@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MIGRATIONS_DIR="/opt/master/supabase/migrations"
+MIGRATIONS_DIR="/opt/master/shared/supabase/migrations"
 DB_USER="postgres"
 
 # Load POSTGRES_HOST from .env if not set
-if [ -z "${POSTGRES_HOST:-}" ] && [ -f /opt/master/supabase/docker/.env ]; then
-  POSTGRES_HOST=$(grep -E '^POSTGRES_HOST=' /opt/master/supabase/docker/.env | cut -d= -f2)
+if [ -z "${POSTGRES_HOST:-}" ] && [ -f /opt/master/shared/supabase/docker/.env ]; then
+  POSTGRES_HOST=$(grep -E '^POSTGRES_HOST=' /opt/master/shared/supabase/docker/.env | cut -d= -f2)
 fi
 POSTGRES_HOST="${POSTGRES_HOST:-db}"
 
@@ -26,8 +26,8 @@ if [ "$POSTGRES_HOST" = "db" ]; then
   }
 else
   # Load password for remote connection
-  if [ -z "${POSTGRES_PASSWORD:-}" ] && [ -f /opt/master/supabase/docker/.env ]; then
-    POSTGRES_PASSWORD=$(grep -E '^POSTGRES_PASSWORD=' /opt/master/supabase/docker/.env | cut -d= -f2)
+  if [ -z "${POSTGRES_PASSWORD:-}" ] && [ -f /opt/master/shared/supabase/docker/.env ]; then
+    POSTGRES_PASSWORD=$(grep -E '^POSTGRES_PASSWORD=' /opt/master/shared/supabase/docker/.env | cut -d= -f2)
   fi
   echo "Using remote database: $POSTGRES_HOST"
   psql_cmd() {

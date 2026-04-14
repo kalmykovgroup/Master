@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      release_name: ${{ steps.version.outputs.release_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +28,18 @@ jobs:
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+
+      - name: Generate release name
+        id: version
+        run: |
+          RELEASE_NAME="$(date -u +%Y%m%d)-$(echo $GITHUB_SHA | head -c 7)"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Write version info
+        run: |
+          echo "release=${{ steps.version.outputs.release_name }}" > dist/version.txt
+          echo "sha=${{ github.sha }}" >> dist/version.txt
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> dist/version.txt
 
       - uses: actions/upload-artifact@v4
         with:
@@ -55,22 +69,41 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ matrix.server }} >> ~/.ssh/known_hosts
 
-      - name: Deploy files
+      - name: Upload release
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
+          RELEASE: ${{ needs.build.outputs.release_name }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key"
+          RELEASE_DIR="/opt/master/releases/$RELEASE"
+
+          # Create release directory
+          $SSH $TARGET "mkdir -p $RELEASE_DIR/dist $RELEASE_DIR/functions"
+
+          # Upload SPA build
+          rsync -az --delete -e "$SSH" dist/ $TARGET:$RELEASE_DIR/dist/
+
+          # Upload edge functions
+          rsync -az --delete -e "$SSH" supabase/functions/ $TARGET:$RELEASE_DIR/functions/
+
+      - name: Upload shared files
         env:
           TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key"
-          RSYNC="rsync -avz -e '$SSH'"
 
-          # Ensure directories exist
-          $SSH $TARGET "mkdir -p /opt/master/supabase/docker /opt/master/supabase/functions /opt/master/supabase/migrations /opt/master/deploy /var/www/master/dist"
+          # Migrations (cumulative, never deleted)
+          $SSH $TARGET "mkdir -p /opt/master/shared/supabase/migrations"
+          rsync -az -e "$SSH" supabase/migrations/ $TARGET:/opt/master/shared/supabase/migrations/
 
-          # Deploy all files
-          eval $RSYNC --delete dist/ $TARGET:/var/www/master/dist/
-          eval $RSYNC supabase/migrations/ $TARGET:/opt/master/supabase/migrations/
-          eval $RSYNC supabase/functions/ $TARGET:/opt/master/supabase/functions/
-          eval $RSYNC supabase/docker/docker-compose.yml $TARGET:/opt/master/supabase/docker/docker-compose.yml
-          eval $RSYNC deploy/ $TARGET:/opt/master/deploy/
+          # Docker compose
+          $SSH $TARGET "mkdir -p /opt/master/shared/supabase/docker"
+          rsync -az -e "$SSH" supabase/docker/docker-compose.yml $TARGET:/opt/master/shared/supabase/docker/docker-compose.yml
+
+          # Deploy scripts
+          $SSH $TARGET "mkdir -p /opt/master/deploy"
+          rsync -az -e "$SSH" deploy/ $TARGET:/opt/master/deploy/
+          $SSH $TARGET "chmod +x /opt/master/deploy/*.sh"
 
       - name: Deploy nginx config
         env:
@@ -78,7 +111,7 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
         run: |
           sed "s/\\\$DOMAIN/$DOMAIN/g" deploy/nginx.conf > /tmp/nginx-master.conf
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" /tmp/nginx-master.conf $TARGET:/tmp/nginx-master.conf
+          rsync -az -e "ssh -i ~/.ssh/deploy_key" /tmp/nginx-master.conf $TARGET:/tmp/nginx-master.conf
           ssh -i ~/.ssh/deploy_key $TARGET "sudo cp /tmp/nginx-master.conf /etc/nginx/sites-available/master && rm /tmp/nginx-master.conf"
 
       - name: Run migrations
@@ -88,12 +121,21 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key $TARGET "bash /opt/master/deploy/migrate.sh"
 
-      - name: Restart services
+      - name: Execute release (symlink switch + smoke test)
         env:
           TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
+          RELEASE: ${{ needs.build.outputs.release_name }}
         run: |
-          ssh -i ~/.ssh/deploy_key $TARGET \
-            "cd /opt/master/supabase/docker && \
-             sudo docker compose up -d functions && \
-             sudo docker compose restart functions && \
-             sudo nginx -t && sudo systemctl reload nginx"
+          ssh -i ~/.ssh/deploy_key $TARGET "bash /opt/master/deploy/release.sh $RELEASE"
+
+      - name: External smoke test
+        env:
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: |
+          sleep 3
+          HTTP_CODE=$(curl -sf -o /dev/null -w '%{http_code}' "https://$DOMAIN/" 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "External smoke test PASSED (HTTP $HTTP_CODE)"
+          else
+            echo "::warning::External smoke test returned HTTP $HTTP_CODE (may need SSL setup first)"
+          fi

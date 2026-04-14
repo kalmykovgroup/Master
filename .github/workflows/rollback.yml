@@ -1,0 +1,47 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release name to roll back to (leave empty for previous)"
+        required: false
+        default: ""
+      server:
+        description: "Server IP (leave empty for all servers)"
+        required: false
+        default: ""
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        server: ${{ fromJson(inputs.server != '' && format('["{0}"]', inputs.server) || vars.APP_SERVERS) }}
+      fail-fast: false
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ matrix.server }} >> ~/.ssh/known_hosts
+
+      - name: Execute rollback
+        env:
+          TARGET: ${{ vars.VPS_USER }}@${{ matrix.server }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $TARGET \
+            "bash /opt/master/deploy/rollback.sh ${{ inputs.release }}"
+
+      - name: Verify
+        env:
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: |
+          sleep 3
+          HTTP_CODE=$(curl -sf -o /dev/null -w '%{http_code}' "https://$DOMAIN/" 2>/dev/null || echo "000")
+          echo "Post-rollback: HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Site returned $HTTP_CODE after rollback"
+          fi
