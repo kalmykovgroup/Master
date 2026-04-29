@@ -14,11 +14,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -138,4 +138,30 @@ jobs:
             echo "External smoke test PASSED (HTTP $HTTP_CODE)"
           else
             echo "::warning::External smoke test returned HTTP $HTTP_CODE (may need SSL setup first)"
+          fi
+
+  tag:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: success()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release tag
+        env:
+          RELEASE: ${{ needs.build.outputs.release_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="release-$RELEASE"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+          else
+            git tag -a "$TAG" -m "Deploy: $RELEASE"
+            git push origin "$TAG"
+            echo "Created tag: $TAG"
           fi
